@@ -1,45 +1,58 @@
-import type { IncomingMessage, ServerResponse } from 'node:http';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { verifyBearerToken } from '../lib/auth.js';
 import { createMcpServer } from '../lib/server.js';
 import { serverUrl } from '../lib/oauth.js';
 
-export default async function handler(req: IncomingMessage, res: ServerResponse) {
-  // --- Auth ---
+export const config = { supportsResponseStreaming: false };
+
+function authCheck(req: Request): Response | null {
   const authToken = process.env.MCP_AUTH_TOKEN;
   if (!authToken) {
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Server misconfigured: MCP_AUTH_TOKEN not set' }));
-    return;
+    return Response.json({ error: 'Server misconfigured: MCP_AUTH_TOKEN not set' }, { status: 500 });
   }
 
-  // Accept auth via: (1) Authorization: Bearer header, or (2) ?token= query param.
-  const authHeader = req.headers.authorization as string | undefined;
-  const urlToken = new URL(req.url ?? '/', `http://${req.headers.host}`).searchParams.get('token');
+  const authHeader = req.headers.get('authorization') ?? undefined;
+  const url = new URL(req.url);
+  const urlToken = url.searchParams.get('token');
   const authenticated =
     verifyBearerToken(authHeader, authToken) ||
     (!!urlToken && verifyBearerToken(`Bearer ${urlToken}`, authToken));
 
   if (!authenticated) {
     const base = serverUrl();
-    res.writeHead(401, {
-      'Content-Type': 'application/json',
-      'WWW-Authenticate': `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource"`,
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: {
+        'Content-Type': 'application/json',
+        'WWW-Authenticate': `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource"`,
+      },
     });
-    res.end(JSON.stringify({ error: 'Unauthorized' }));
-    return;
   }
+  return null;
+}
 
-  // --- MCP ---
+export async function POST(req: Request): Promise<Response> {
+  const denied = authCheck(req);
+  if (denied) return denied;
+
   const { server } = createMcpServer();
-
-  // enableJsonResponse: true → return plain JSON instead of SSE streams.
-  // Critical for serverless (Vercel) where long-lived SSE connections get killed.
-  const transport = new StreamableHTTPServerTransport({
+  const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
-  } as any); // 'as any' because the Node wrapper's types don't expose enableJsonResponse, but it passes through
+  });
 
   await server.connect(transport);
-  await transport.handleRequest(req, res);
+  return transport.handleRequest(req);
+}
+
+export async function GET(req: Request): Promise<Response> {
+  const denied = authCheck(req);
+  if (denied) return denied;
+
+  // GET for SSE listening — return 405 in serverless
+  return new Response(null, { status: 405 });
+}
+
+export async function DELETE(): Promise<Response> {
+  return new Response(null, { status: 405 });
 }
