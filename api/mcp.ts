@@ -12,8 +12,15 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return;
   }
 
+  // Accept auth via: (1) Authorization: Bearer header, or (2) ?token= query param.
+  // Option 2 lets claude.ai custom connectors work without OAuth.
   const authHeader = req.headers.authorization as string | undefined;
-  if (!verifyBearerToken(authHeader, authToken)) {
+  const urlToken = new URL(req.url ?? '/', `http://${req.headers.host}`).searchParams.get('token');
+  const authenticated =
+    verifyBearerToken(authHeader, authToken) ||
+    (!!urlToken && verifyBearerToken(`Bearer ${urlToken}`, authToken));
+
+  if (!authenticated) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unauthorized' }));
     return;
