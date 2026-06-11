@@ -14,7 +14,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   }
 
   // Accept auth via: (1) Authorization: Bearer header, or (2) ?token= query param.
-  // Option 2 lets claude.ai custom connectors work without OAuth.
   const authHeader = req.headers.authorization as string | undefined;
   const urlToken = new URL(req.url ?? '/', `http://${req.headers.host}`).searchParams.get('token');
   const authenticated =
@@ -34,9 +33,12 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   // --- MCP ---
   const { server } = createMcpServer();
 
+  // enableJsonResponse: true → return plain JSON instead of SSE streams.
+  // Critical for serverless (Vercel) where long-lived SSE connections get killed.
   const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined, // stateless mode
-  });
+    sessionIdGenerator: undefined,
+    enableJsonResponse: true,
+  } as any); // 'as any' because the Node wrapper's types don't expose enableJsonResponse, but it passes through
 
   await server.connect(transport);
   await transport.handleRequest(req, res);
