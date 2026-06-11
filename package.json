@@ -1,0 +1,20 @@
+{
+  "name": "edmingle-mcp-remote",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0",
+    "vercel": "^41.0.0",
+    "vitest": "^2.0.0"
+  }
+}
