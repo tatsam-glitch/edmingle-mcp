@@ -43,10 +43,7 @@ export function verifyAuthCode(code: string, secret: string): boolean {
   }
 }
 
-/** The base URL of this server (from VERCEL_URL or fallback). */
+/** The base URL of this server. Always use the stable production domain. */
 export function serverUrl(): string {
-  const host = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : process.env.SERVER_URL ?? 'https://edmingle-mcp.vercel.app';
-  return host;
+  return process.env.SERVER_URL ?? 'https://edmingle-mcp.vercel.app';
 }
