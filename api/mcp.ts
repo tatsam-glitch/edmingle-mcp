@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { verifyBearerToken } from '../lib/auth.js';
 import { createMcpServer } from '../lib/server.js';
+import { serverUrl } from '../lib/oauth.js';
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   // --- Auth ---
@@ -21,7 +22,11 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     (!!urlToken && verifyBearerToken(`Bearer ${urlToken}`, authToken));
 
   if (!authenticated) {
-    res.writeHead(401, { 'Content-Type': 'application/json' });
+    const base = serverUrl();
+    res.writeHead(401, {
+      'Content-Type': 'application/json',
+      'WWW-Authenticate': `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource"`,
+    });
     res.end(JSON.stringify({ error: 'Unauthorized' }));
     return;
   }
