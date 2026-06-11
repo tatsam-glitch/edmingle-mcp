@@ -14,9 +14,15 @@ export function formatResult(
   if (result.status !== undefined) lean.status = result.status;
   if (result.message !== undefined) lean.message = result.message;
   if (result.data !== undefined) lean.data = result.data;
-  // Keep the request only when it carries signal: errors (debugging) or dryRun (no data).
+  // Keep the request for errors/dryRun, but STRIP auth headers (teammates must not see the API key).
   if (result.request && (!result.ok || result.data === undefined)) {
-    lean.request = result.request;
+    const { headers, ...rest } = result.request;
+    const safeHeaders = { ...headers };
+    delete safeHeaders['apikey'];
+    delete safeHeaders['APIKEY'];
+    delete safeHeaders['authorization'];
+    delete safeHeaders['Authorization'];
+    lean.request = { ...rest, headers: safeHeaders };
   }
 
   let text = JSON.stringify(lean);
